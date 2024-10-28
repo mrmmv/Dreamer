@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,8 +6,7 @@
     <title>Sleep Apnea Monitoring</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
-    <style>
+ <style>
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -60,17 +58,6 @@
             min-height: 200px;
         }
 
-        .box h2 {
-            font-size: 18px;
-            color: #444;
-        }
-
-        #viewAll {
-            color: #FFAFBD;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
         .modal {
             display: none;
             position: fixed;
@@ -110,14 +97,19 @@
 </head>
 <body>
     <header>
-        <img src="your-logo-url.png" alt="Logo"> <!-- Replace with your logo URL -->
-        <h1>Sleep Apnea Monitoring</h1>
+        <img src="your-logo-url.png" alt="Logo">
+        <h1>DREAMER: Sleep Apnea Monitoring</h1>
     </header>
 
     <div class="container">
         <div class="box" id="currentReadings">
             <h2>Current Readings</h2>
-            <div id="readings"></div>
+            <div id="readings">
+                <p>BPM: <span id="bpmValue">N/A</span></p>
+                <p>SpO2: <span id="spo2Value">N/A</span></p>
+                <p>ECG: <span id="ecgValue">N/A</span></p>
+                <p>Snore Data: <span id="snoreValue">N/A</span></p>
+            </div>
         </div>
 
         <div class="box" id="recentResult">
@@ -126,7 +118,7 @@
         </div>
 
         <div class="box" id="predictions">
-            <h2>Predictions</h2>
+            <h2>Predictions History</h2>
             <div id="recentPredictions"></div>
             <p><span id="viewAll">View All</span></p>
         </div>
@@ -141,126 +133,88 @@
     </div>
 
     <script>
-    // Firebase configuration
-    const firebaseConfig = {
-        apiKey: "AIzaSyBq3D14Ga7l2FtRwAVZqhU5Obg2Boum_lk",
-        authDomain: "project-sleep-apnea.firebaseapp.com",
-        databaseURL: "https://project-sleep-apnea-default-rtdb.firebaseio.com",
-        projectId: "project-sleep-apnea",
-        storageBucket: "project-sleep-apnea.appspot.com",
-        messagingSenderId: "1043616455982",
-        appId: "1:1043616455982:web:04c503d8d5ef38126f2ebf"
-    };
+        const firebaseConfig = {
+            apiKey: "AIzaSyBq3D14Ga7l2FtRwAVZqhU5Obg2Boum_lk",
+            authDomain: "project-sleep-apnea.firebaseapp.com",
+            databaseURL: "https://project-sleep-apnea-default-rtdb.firebaseio.com",
+            projectId: "project-sleep-apnea",
+            storageBucket: "project-sleep-apnea.appspot.com",
+            messagingSenderId: "1043616455982",
+            appId: "1:1043616455982:web:04c503d8d5ef38126f2ebf"
+        };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-    let previousValues = { bpm: null, spo2: null, ecg: null, snoreData: null };
-
-    function getSeverity(snoreData) {
-        if (snoreData < 6) return "No Sleep Apnea";
-        if (snoreData < 16) return "Mild Sleep Apnea";
-        if (snoreData < 31) return "Moderate Sleep Apnea";
-        return "Severe Sleep Apnea";
-    }
-
-    function checkSleepApnea(bpm, spo2, ecg, snoreData) {
-        const severity = getSeverity(snoreData);
-        const apneaCondition = (bpm < 60 || bpm > 100) || (spo2 < 79 && (ecg < 300 || ecg > 700));
-        const prediction = apneaCondition ? severity : "No Sleep Apnea";
-
-        db.ref("predictions").push({
-            prediction: prediction,
-            timestamp: new Date().toISOString()
-        });
-
-        return prediction;
-    }
-
-    function updatePredictionIfChanged(newValues) {
-        const { bpm, spo2, ecg, snoreData } = newValues;
-        let changeCount = 0;
-
-        // Check which values have changed
-        Object.keys(previousValues).forEach((key) => {
-            if (previousValues[key] !== newValues[key]) {
-                changeCount++;
-            }
-        });
-
-        // Make a prediction only if at least two values have changed
-        if (changeCount >= 1) {
-            const prediction = checkSleepApnea(bpm, spo2, ecg, snoreData);
-            document.getElementById("recent").innerHTML = `<p>Prediction: ${prediction}</p>`;
-            previousValues = { ...newValues };
+        function updateReading(sensor, value) {
+            document.getElementById(`${sensor}Value`).innerText = value;
         }
-    }
 
-    function displayData() {
-        const readingsDiv = document.getElementById("readings");
-
-        // Real-time listeners for each sensor
-        db.ref("Heart_rate/Heart_rate").limitToLast(1).on("child_added", (snapshot) => {
-            const bpm = snapshot.val();
-            readingsDiv.innerHTML = `<p>BPM: ${bpm}</p>` + readingsDiv.innerHTML;
-            updatePredictionIfChanged({ ...previousValues, bpm });
-        });
-
-        db.ref("SPo2/SPo2").limitToLast(1).on("child_added", (snapshot) => {
-            const spo2 = snapshot.val();
-            readingsDiv.innerHTML = `<p>SpO2: ${spo2}</p>` + readingsDiv.innerHTML;
-            updatePredictionIfChanged({ ...previousValues, spo2 });
-        });
-
-        db.ref("ecg_readings").limitToLast(1).on("child_added", (snapshot) => {
-            const ecg = snapshot.val().ecg_value;
-            readingsDiv.innerHTML = `<p>ECG: ${ecg}</p>` + readingsDiv.innerHTML;
-            updatePredictionIfChanged({ ...previousValues, ecg });
-        });
-
-        db.ref("snoreData").limitToLast(1).on("child_added", (snapshot) => {
-            const snoreData = snapshot.val().count;
-            readingsDiv.innerHTML = `<p>Snore Data: ${snoreData}</p>` + readingsDiv.innerHTML;
-            updatePredictionIfChanged({ ...previousValues, snoreData });
-        });
-
-        // Fetch the most recent prediction and display it in the "Recent Result" section
-        db.ref("predictions").limitToLast(1).on("child_added", (snapshot) => {
-            const entry = snapshot.val();
-            document.getElementById("recent").innerHTML = `<p>Prediction: ${entry.prediction} - ${new Date(entry.timestamp).toLocaleString()}</p>`;
-        });
-
-        // Fetch last five predictions
-        db.ref("predictions").limitToLast(5).on("value", (snapshot) => {
+        function fetchLatestPredictions() {
             const predictionsDiv = document.getElementById("recentPredictions");
+            const recentResultDiv = document.getElementById("recent");
+
             predictionsDiv.innerHTML = "";
-            snapshot.forEach((child) => {
-                const entry = child.val();
-                predictionsDiv.innerHTML = `<p>${entry.prediction} - ${new Date(entry.timestamp).toLocaleString()}</p>` + predictionsDiv.innerHTML;
+            recentResultDiv.innerHTML = "";
+
+            db.ref("predictions").orderByKey().limitToLast(5).once("value", (snapshot) => {
+                const predictions = [];
+
+                snapshot.forEach((child) => {
+                    predictions.unshift(child.val());
+                });
+
+                predictions.forEach((entry, index) => {
+                    const timestamp = new Date(entry.timestamp).toLocaleString();
+                    const predictionHTML = `<p>${entry.prediction} - ${timestamp}</p>`;
+
+                    if (index === 0) {
+                        recentResultDiv.innerHTML = predictionHTML;
+                    } else {
+                        predictionsDiv.innerHTML += predictionHTML;
+                    }
+                });
             });
-        });
-    }
+        }
 
-    function showAllPredictions() {
-        const modal = document.getElementById("allPredictionsModal");
-        const allPredictionsDiv = document.getElementById("allPredictions");
-        allPredictionsDiv.innerHTML = "";
+        function showAllPredictions() {
+            const allPredictionsDiv = document.getElementById("allPredictions");
+            allPredictionsDiv.innerHTML = "";
 
-        db.ref("predictions").once("value", (snapshot) => {
-            snapshot.forEach((child) => {
-                const entry = child.val();
-                allPredictionsDiv.innerHTML = `<p>${entry.prediction} - ${new Date(entry.timestamp).toLocaleString()}</p>` + allPredictionsDiv.innerHTML;
+            db.ref("predictions").once("value", (snapshot) => {
+                snapshot.forEach((child) => {
+                    const entry = child.val();
+                    const timestamp = new Date(entry.timestamp).toLocaleString();
+                    allPredictionsDiv.innerHTML += `<p>${entry.prediction} - ${timestamp}</p>`;
+                });
             });
-        });
 
-        modal.style.display = "flex";
-    }
+            document.getElementById("allPredictionsModal").style.display = "flex";
+        }
 
-    document.getElementById("closeModal").onclick = () => {
-        document.getElementById("allPredictionsModal").style.display = "none";
-    };
+        function setupListeners() {
+            const sensorPaths = [
+                { refPath: "Heart_rate/Heart_rate", elementId: "bpm", key: "Heart_rate" },
+                { refPath: "SPo2/SPo2", elementId: "spo2", key: "SPo2" },
+                { refPath: "ecg_readings", elementId: "ecg", key: "ecg_value" },
+                { refPath: "snoreData", elementId: "snore", key: "count" }
+            ];
 
-    document.getElementById("viewAll").onclick = showAllPredictions;
+            sensorPaths.forEach(sensor => {
+                db.ref(sensor.refPath).limitToLast(1).on("child_added", (snapshot) => {
+                    const newValue = snapshot.val()[sensor.key] || snapshot.val();
+                    updateReading(sensor.elementId, newValue);
+                    fetchLatestPredictions(); // Trigger prediction update when any sensor changes
+                });
+            });
+        }
 
-    displayData();
-</script>
+        document.getElementById("viewAll").onclick = showAllPredictions;
+        document.getElementById("closeModal").onclick = () => {
+            document.getElementById("allPredictionsModal").style.display = "none";
+        };
+
+        setupListeners();
+    </script>
+</body>
+</html>
